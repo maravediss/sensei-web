@@ -1,25 +1,31 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const url = process.env.SUPABASE_URL || "https://supabase.margitalia.com";
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+let _client: SupabaseClient | null = null;
 
-export const supabase = createClient(url, serviceKey, {
-  auth: { persistSession: false, autoRefreshToken: false },
-  db: { schema: "sensei" },
-});
-
-// Plain SQL via PostgREST RPC functions (when schema exposure not available)
-export async function sql<T = unknown>(query: string): Promise<T[]> {
-  const resp = await fetch(`${url}/rest/v1/rpc/sensei_query`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-    },
-    body: JSON.stringify({ q: query }),
-    cache: "no-store",
+export function getSupabase(): SupabaseClient {
+  if (_client) return _client;
+  const url = process.env.SUPABASE_URL || "http://supabase-kong:8000";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) {
+    // dummy client during build (won't run queries)
+    _client = createClient(url, "build-placeholder", {
+      auth: { persistSession: false, autoRefreshToken: false },
+      db: { schema: "sensei" },
+    });
+    return _client;
+  }
+  _client = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    db: { schema: "sensei" },
   });
-  if (!resp.ok) throw new Error(`SQL ${resp.status}: ${await resp.text()}`);
-  return resp.json();
+  return _client;
 }
+
+// Backwards-compat: lazy proxy
+export const supabase = new Proxy({} as SupabaseClient, {
+  get(_t, p) {
+    const c = getSupabase();
+    // @ts-expect-error proxy access
+    return c[p];
+  },
+});
