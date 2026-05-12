@@ -1,8 +1,9 @@
 import { requireAuth } from "@/lib/auth";
-import { getDashboard } from "@/lib/queries";
+import { getDashboard, getLatestReports } from "@/lib/queries";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
+import { WeightChart, VolumeBarChart } from "@/components/Charts";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,10 +12,10 @@ const MUSCLE_LABELS: Record<string, string> = {
   chest: "Pecho",
   "chest-upper": "Pecho sup.",
   "chest-lower": "Pecho inf.",
-  "back-lats": "Espalda (lats)",
+  "back-lats": "Espalda lats",
   "back-mid": "Espalda media",
   "delt-anterior": "Hombro ant.",
-  "delt-lateral": "Hombro lateral",
+  "delt-lateral": "Hombro lat.",
   "delt-posterior": "Hombro post.",
   triceps: "Tríceps",
   biceps: "Bíceps",
@@ -22,7 +23,7 @@ const MUSCLE_LABELS: Record<string, string> = {
   hamstrings: "Isquios",
   glutes: "Glúteos",
   abs: "Abs",
-  "abs-lower": "Abs inferior",
+  "abs-lower": "Abs inf.",
   "abs-oblique": "Oblicuos",
   brachialis: "Braquial",
   forearm: "Antebrazo",
@@ -30,24 +31,48 @@ const MUSCLE_LABELS: Record<string, string> = {
   "full-body": "Cuerpo entero",
 };
 
+const VOLUME_TARGETS: Record<string, number> = {
+  chest: 16,
+  "delt-lateral": 16,
+  "delt-posterior": 12,
+  triceps: 12,
+  biceps: 12,
+  "back-lats": 14,
+  "back-mid": 14,
+  quads: 6,
+  hamstrings: 4,
+  abs: 14,
+};
+
 const SESSION_LABELS: Record<string, string> = {
-  "upper-push": "D1 Upper Push",
-  "upper-pull": "D2 Upper Pull",
-  "upper-mixed-legs": "D3 Mixed + Legs",
+  "upper-push": "D1 Push",
+  "upper-pull": "D2 Pull",
+  "upper-mixed-legs": "D3 Mixed",
   other: "Otro",
 };
 
 export default async function Dashboard() {
   await requireAuth();
   const d = await getDashboard();
+  const reports = await getLatestReports(2);
 
   const today = new Date();
   const dayName = format(today, "EEEE d 'de' MMMM", { locale: es });
-
   const sleepDelta = d.avgSleep7d != null && d.avgSleep7d < 7;
   const kcalPct = d.todayKcal && d.activePlan ? (d.todayKcal.kcal_total / d.activePlan.kcal_target_kcal) * 100 : 0;
   const proteinPct =
     d.todayKcal && d.activePlan ? (d.todayKcal.protein_total / d.activePlan.protein_target_g) * 100 : 0;
+
+  const volumeChartData = d.weekSetsByMuscle.slice(0, 12).map((m) => ({
+    muscle: MUSCLE_LABELS[m.primary_muscle] || m.primary_muscle,
+    sets: m.effective_sets,
+    targetKey: m.primary_muscle,
+  }));
+  const targetMap: Record<string, number> = {};
+  volumeChartData.forEach((d) => {
+    const t = VOLUME_TARGETS[d.targetKey];
+    if (t) targetMap[d.muscle] = t;
+  });
 
   return (
     <div className="space-y-8">
@@ -59,7 +84,7 @@ export default async function Dashboard() {
         {d.activePlan && (
           <div className="text-right text-xs text-neutral-500">
             <p className="font-medium text-neutral-300">{d.activePlan.name}</p>
-            <p>Plan activo · semana ?? de {d.activePlan.weeks}</p>
+            <p>Plan activo · target {d.activePlan.kcal_target_kcal} kcal / {d.activePlan.protein_target_g} P</p>
           </div>
         )}
       </div>
@@ -87,7 +112,7 @@ export default async function Dashboard() {
               {d.todayKcal ? `${Math.round(d.todayKcal.kcal_total)}` : "0"}
               {d.activePlan && <span className="text-base text-neutral-500"> / {d.activePlan.kcal_target_kcal}</span>}
             </p>
-            <p className={`kpi-delta ${kcalPct > 110 ? "delta-bad" : kcalPct < 50 && new Date().getHours() > 18 ? "delta-bad" : "delta-neutral"}`}>
+            <p className={`kpi-delta ${kcalPct > 110 ? "delta-bad" : "delta-neutral"}`}>
               {kcalPct.toFixed(0)}% del target
             </p>
           </div>
@@ -104,34 +129,26 @@ export default async function Dashboard() {
         </div>
       </section>
 
-      {d.weekSetsByMuscle.length > 0 && (
-        <section>
-          <h2 className="section-title">Volumen esta semana por grupo muscular</h2>
-          <div className="rounded-2xl border border-[#2a2a2a] bg-[#111] p-4">
-            <div className="space-y-2">
-              {d.weekSetsByMuscle.slice(0, 10).map((m) => {
-                const max = Math.max(...d.weekSetsByMuscle.map((x) => x.effective_sets));
-                const pct = (m.effective_sets / max) * 100;
-                return (
-                  <div key={m.primary_muscle} className="flex items-center gap-3">
-                    <span className="w-32 text-xs text-neutral-400">
-                      {MUSCLE_LABELS[m.primary_muscle] || m.primary_muscle}
-                    </span>
-                    <div className="flex-1 h-6 bg-[#1a1a1a] rounded overflow-hidden relative">
-                      <div className="h-full bg-[#21D177]/70" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="w-12 text-right text-sm tabular-nums">{m.effective_sets}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
+      <section>
+        <h2 className="section-title">Tendencia de peso (últimos 90 días)</h2>
+        <div className="rounded-2xl border border-[#2a2a2a] bg-[#111] p-4">
+          <WeightChart data={d.weightSeries} />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="section-title">Volumen esta semana por grupo muscular</h2>
+        <div className="rounded-2xl border border-[#2a2a2a] bg-[#111] p-4">
+          <VolumeBarChart data={volumeChartData} targetByMuscle={targetMap} />
+          <p className="text-xs text-neutral-500 mt-2">
+            Verde = en rango. Naranja = bajo MEV o sobre MRV. Targets basados en Israetel RP.
+          </p>
+        </div>
+      </section>
 
       {d.activeInjuries.length > 0 && (
         <section>
-          <h2 className="section-title text-[#E95A0C]">⚠ Lesiones activas</h2>
+          <h2 className="section-title text-[#E95A0C]">🔴 Lesiones activas</h2>
           <div className="rounded-2xl border border-[#E95A0C]/40 bg-[#E95A0C]/5 p-4">
             <ul className="text-sm space-y-1">
               {d.activeInjuries.map((i, idx) => (
@@ -141,6 +158,23 @@ export default async function Dashboard() {
                 </li>
               ))}
             </ul>
+          </div>
+        </section>
+      )}
+
+      {reports.length > 0 && (
+        <section>
+          <h2 className="section-title">Últimos reportes Sensei</h2>
+          <div className="space-y-3">
+            {reports.map((r: any) => (
+              <details key={r.id} className="rounded-2xl border border-[#2a2a2a] bg-[#111] p-4">
+                <summary className="cursor-pointer text-sm font-medium">
+                  {r.period_type === "weekly" ? "📊 Semanal" : "📋 Diario"} · {r.period_start}
+                  {r.period_type === "weekly" && ` → ${r.period_end}`}
+                </summary>
+                <div className="mt-3 text-sm whitespace-pre-wrap text-neutral-300">{r.summary_md}</div>
+              </details>
+            ))}
           </div>
         </section>
       )}
@@ -173,7 +207,7 @@ export default async function Dashboard() {
           </div>
         ) : (
           <p className="text-sm text-neutral-500">
-            Aún no hay sesiones registradas. Escríbele al bot de Telegram cuando entrenes.
+            Aún no hay sesiones. Escríbele al bot de Telegram cuando entrenes.
           </p>
         )}
       </section>
