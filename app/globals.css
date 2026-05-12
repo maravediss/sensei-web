@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0A0A0A;
+  --fg: #F0F0F0;
+  --green: #21D177;
+  --orange: #E95A0C;
+  --muted: #1a1a1a;
+  --border: #2a2a2a;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.kpi-card {
+  @apply rounded-2xl p-5 border border-[#2a2a2a] bg-[#111] hover:border-[#21D177]/40 transition;
+}
+
+.kpi-value {
+  @apply text-3xl font-bold tracking-tight text-[#F0F0F0];
+}
+
+.kpi-label {
+  @apply text-xs uppercase tracking-wider text-neutral-400 mt-1;
+}
+
+.kpi-delta {
+  @apply text-sm mt-2;
+}
+
+.delta-good { color: #21D177; }
+.delta-bad  { color: #E95A0C; }
+.delta-neutral { color: #888; }
+
+.nav-link {
+  @apply px-3 py-2 rounded-lg text-sm text-neutral-300 hover:text-white hover:bg-[#1a1a1a] transition;
+}
+.nav-link.active {
+  @apply text-[#21D177] bg-[#21D177]/10;
+}
+
+.section-title {
+  @apply text-sm uppercase tracking-wider text-neutral-500 font-medium mb-3;
+}
+
+table.data-table {
+  @apply w-full text-sm;
+}
+table.data-table th {
+  @apply text-left text-xs uppercase tracking-wider text-neutral-500 font-medium border-b border-[#2a2a2a] py-2 px-2;
+}
+table.data-table td {
+  @apply py-2 px-2 border-b border-[#1a1a1a];
+}
+
+.btn-primary {
+  @apply px-4 py-2 rounded-lg bg-[#21D177] text-black font-medium hover:bg-[#1cb869] transition;
+}
+.btn-ghost {
+  @apply px-4 py-2 rounded-lg border border-[#2a2a2a] text-neutral-300 hover:bg-[#1a1a1a] transition;
+}
