@@ -130,6 +130,78 @@ export default async function Dashboard() {
       </section>
 
       <section>
+        <h2 className="section-title">Apple Watch — últimos 7 días</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="kpi-card">
+            <p className="kpi-label">HRV media 7d</p>
+            <p className="kpi-value">{d.avgHrv7d != null ? `${d.avgHrv7d.toFixed(0)} ms` : "—"}</p>
+            <p className={`kpi-delta ${d.avgHrv7d != null && d.avgHrv7d < 40 ? "delta-bad" : "delta-neutral"}`}>
+              {d.avgHrv7d != null && d.avgHrv7d < 40 ? "Estrés / mala recuperación" : "Variabilidad cardiaca"}
+            </p>
+          </div>
+          <div className="kpi-card">
+            <p className="kpi-label">FC reposo 7d</p>
+            <p className="kpi-value">{d.avgRhr7d != null ? `${d.avgRhr7d.toFixed(0)} bpm` : "—"}</p>
+            <p className="kpi-delta delta-neutral">Frecuencia cardiaca en reposo</p>
+          </div>
+          <div className="kpi-card">
+            <p className="kpi-label">Pasos hoy</p>
+            <p className="kpi-value">{d.todaySteps != null ? d.todaySteps.toLocaleString("es-ES") : "—"}</p>
+            <p className="kpi-delta delta-neutral">
+              {d.todayDistance != null ? `${d.todayDistance.toFixed(2)} km` : "—"}
+            </p>
+          </div>
+          <div className="kpi-card">
+            <p className="kpi-label">Calorías activas hoy</p>
+            <p className="kpi-value">{d.todayActiveKcal != null ? d.todayActiveKcal : "—"}</p>
+            <p className="kpi-delta delta-neutral">
+              {d.todayExerciseMin != null ? `${d.todayExerciseMin} min ejercicio` : "—"}
+            </p>
+          </div>
+        </div>
+
+        {d.appleWatch7d.length > 0 && (
+          <div className="rounded-2xl border border-[#2a2a2a] bg-[#111] p-4 overflow-x-auto">
+            <table className="data-table text-xs min-w-full">
+              <thead>
+                <tr>
+                  <th>Día</th>
+                  <th>HRV</th>
+                  <th>FC reposo</th>
+                  <th>Sueño</th>
+                  <th>Pasos</th>
+                  <th>Km</th>
+                  <th>Kcal act.</th>
+                  <th>Min ejercicio</th>
+                  <th>De pie (h)</th>
+                  <th>Pisos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {d.appleWatch7d.map((r) => (
+                  <tr key={r.date}>
+                    <td>{format(parseISO(r.date), "d MMM", { locale: es })}</td>
+                    <td>{r.hrv_ms ?? "—"}</td>
+                    <td>{r.resting_hr ?? "—"}</td>
+                    <td>{r.sleep_h != null ? `${r.sleep_h} h` : "—"}</td>
+                    <td>{r.steps?.toLocaleString("es-ES") ?? "—"}</td>
+                    <td>{r.distance_km != null ? r.distance_km.toFixed(2) : "—"}</td>
+                    <td>{r.active_kcal ?? "—"}</td>
+                    <td>{r.exercise_minutes ?? "—"}</td>
+                    <td>{r.stand_hours ?? "—"}</td>
+                    <td>{r.flights_climbed ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-xs text-neutral-500 mt-2">
+              Datos del Apple Watch, sincronización automática diaria.
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section>
         <h2 className="section-title">Tendencia de peso (últimos 90 días)</h2>
         <div className="rounded-2xl border border-[#2a2a2a] bg-[#111] p-4">
           <WeightChart data={d.weightSeries} />

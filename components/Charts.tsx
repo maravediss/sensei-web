@@ -36,6 +36,78 @@ export function WeightChart({ data }: { data: { date: string; weight: number }[]
   );
 }
 
+type DateSeries = { date: string; y: number };
+
+export function HealthTrendChart({
+  data,
+  color = "#21D177",
+  unit = "",
+}: {
+  data: DateSeries[];
+  color?: string;
+  unit?: string;
+}) {
+  if (!data?.length) return <p className="text-xs text-neutral-500">Sin datos en últimos 30 días.</p>;
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+        <XAxis dataKey="date" stroke="#666" fontSize={10} />
+        <YAxis domain={["auto", "auto"]} stroke="#666" fontSize={10} />
+        <Tooltip
+          contentStyle={{ backgroundColor: "#111", border: "1px solid #2a2a2a", borderRadius: 8, color: "#F0F0F0" }}
+          formatter={(v: any) => [`${v} ${unit}`, ""]}
+        />
+        <Line type="monotone" dataKey="y" stroke={color} strokeWidth={2} dot={{ fill: color, r: 2 }} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function SleepBarChart({ data }: { data: DateSeries[] }) {
+  if (!data?.length) return <p className="text-xs text-neutral-500">No hay registros de sueño. Duerme con el Apple Watch puesto.</p>;
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <BarChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+        <XAxis dataKey="date" stroke="#666" fontSize={10} />
+        <YAxis domain={[0, 10]} stroke="#666" fontSize={10} />
+        <Tooltip
+          contentStyle={{ backgroundColor: "#111", border: "1px solid #2a2a2a", borderRadius: 8, color: "#F0F0F0" }}
+          formatter={(v: any) => [`${v} h`, "Sueño"]}
+        />
+        <Bar dataKey="y" radius={[4, 4, 0, 0]}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.y < 6 ? "#E95A0C" : d.y < 7 ? "#FFC107" : "#21D177"} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function StepsBarChart({ data }: { data: DateSeries[] }) {
+  if (!data?.length) return <p className="text-xs text-neutral-500">Sin datos de pasos.</p>;
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+        <XAxis dataKey="date" stroke="#666" fontSize={10} />
+        <YAxis stroke="#666" fontSize={10} />
+        <Tooltip
+          contentStyle={{ backgroundColor: "#111", border: "1px solid #2a2a2a", borderRadius: 8, color: "#F0F0F0" }}
+          formatter={(v: any) => [Number(v).toLocaleString("es-ES"), "Pasos"]}
+        />
+        <Bar dataKey="y" radius={[4, 4, 0, 0]}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={d.y < 5000 ? "#E95A0C" : d.y < 7500 ? "#FFC107" : "#21D177"} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 export function VolumeBarChart({
   data,
   targetByMuscle,

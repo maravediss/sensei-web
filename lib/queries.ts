@@ -1,15 +1,38 @@
 import { supabase } from "./supabase";
 import { startOfWeek, formatISO, subDays } from "date-fns";
 
+export type AppleWatchDay = {
+  date: string;
+  hrv_ms: number | null;
+  resting_hr: number | null;
+  sleep_h: number | null;
+  active_kcal: number | null;
+  basal_kcal: number | null;
+  exercise_minutes: number | null;
+  stand_hours: number | null;
+  steps: number | null;
+  distance_km: number | null;
+  flights_climbed: number | null;
+  walking_hr_avg: number | null;
+};
+
 export type DashboardData = {
   lastWeight: { weight_kg: number; date: string } | null;
   avgSleep7d: number | null;
+  avgHrv7d: number | null;
+  avgRhr7d: number | null;
+  todaySteps: number | null;
+  todayActiveKcal: number | null;
+  todayDistance: number | null;
+  todayExerciseMin: number | null;
+  hrvTrend: { date: string; hrv: number }[];
   weekSetsByMuscle: { primary_muscle: string; effective_sets: number }[];
   todayKcal: { kcal_total: number; protein_total: number; carbs_total: number; fat_total: number } | null;
   activeInjuries: { region: string; severity: number; restrictions: string | null }[];
   activePlan: { name: string; start_date: string; weeks: number; kcal_target_kcal: number; protein_target_g: number } | null;
   recentSessions: { id: string; date: string; type: string; rpe_global: number | null }[];
   weightSeries: { date: string; weight: number }[];
+  appleWatch7d: AppleWatchDay[];
 };
 
 export async function getDashboard(): Promise<DashboardData> {
@@ -74,9 +97,38 @@ export async function getDashboard(): Promise<DashboardData> {
     .gte("date", formatISO(subDays(now, 90), { representation: "date" }))
     .order("date", { ascending: true });
 
+  // Apple Watch ultimos 7 dias
+  const { data: appleRows } = await supabase
+    .from("body_metrics")
+    .select(
+      "date, hrv_ms, resting_hr, sleep_h, active_kcal, basal_kcal, exercise_minutes, stand_hours, steps, distance_km, flights_climbed, walking_hr_avg"
+    )
+    .gte("date", formatISO(subDays(now, 7), { representation: "date" }))
+    .order("date", { ascending: false });
+
+  const aw = (appleRows || []) as AppleWatchDay[];
+  const todayStr = formatISO(now, { representation: "date" });
+  const todayRow = aw.find((r) => r.date === todayStr);
+  const hrvValues = aw.map((r) => Number(r.hrv_ms || 0)).filter((v) => v > 0);
+  const rhrValues = aw.map((r) => Number(r.resting_hr || 0)).filter((v) => v > 0);
+  const avgHrv7d = hrvValues.length > 0 ? hrvValues.reduce((a, b) => a + b, 0) / hrvValues.length : null;
+  const avgRhr7d = rhrValues.length > 0 ? rhrValues.reduce((a, b) => a + b, 0) / rhrValues.length : null;
+  const hrvTrend = [...aw]
+    .filter((r) => r.hrv_ms != null)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((r) => ({ date: r.date.substring(5), hrv: Number(r.hrv_ms) }));
+
   return {
     lastWeight: weightRow ? { weight_kg: Number(weightRow.weight_kg), date: weightRow.date } : null,
     avgSleep7d,
+    avgHrv7d,
+    avgRhr7d,
+    todaySteps: todayRow?.steps ?? null,
+    todayActiveKcal: todayRow?.active_kcal ?? null,
+    todayDistance: todayRow?.distance_km ?? null,
+    todayExerciseMin: todayRow?.exercise_minutes ?? null,
+    hrvTrend,
+    appleWatch7d: aw,
     weekSetsByMuscle: (volRows || []).map((r) => ({
       primary_muscle: r.primary_muscle,
       effective_sets: Number(r.effective_sets),
@@ -172,6 +224,18 @@ export async function getExerciseProgression(slug: string, limit = 20) {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-limit)
     .map((d) => ({ ...d, date: d.date.substring(5) }));
+}
+
+export async function getHealthTrend(days = 30) {
+  const since = formatISO(subDays(new Date(), days), { representation: "date" });
+  const { data } = await supabase
+    .from("body_metrics")
+    .select(
+      "date, weight_kg, hrv_ms, resting_hr, sleep_h, active_kcal, exercise_minutes, stand_hours, steps, distance_km, flights_climbed, walking_hr_avg, source"
+    )
+    .gte("date", since)
+    .order("date", { ascending: true });
+  return (data || []) as AppleWatchDay[] & { weight_kg: number | null; source: string }[];
 }
 
 export async function getLatestReports(limit = 5) {
